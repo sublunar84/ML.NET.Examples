@@ -362,6 +362,12 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-/ImageClassification/workspace
-/ImageClassification/assets
-/ImageClassification/test
+# Ignore directories within assets
+/ImageClassification/assets/*/
+
+# Ignore .jpg, .png, and .zip files within assets, workspace and test
+/ImageClassification/assets/*.jpg
+/ImageClassification/assets/*.png
+/ImageClassification/test/*.jpg
+/ImageClassification/test/*.png
+/ImageClassification/workspace/*.zip
