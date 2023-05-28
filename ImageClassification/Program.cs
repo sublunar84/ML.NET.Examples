@@ -86,14 +86,14 @@ void SaveModel(MLContext mlContext, ITransformer trainedModel, IDataView data)
 static void OutputPrediction(ModelOutput prediction)
 {
     string imageName = Path.GetFileName(prediction.ImagePath);
-    Console.WriteLine($"Image: {imageName} | Actual Value: {prediction.Label} | Predicted Value: {prediction.PredictedLabel}");
+    Console.WriteLine($"Image: {imageName} | Actual Value: {prediction.Label} | Predicted Value: {prediction.PredictedLabel} | Score: {prediction.Score.Max()}");
 }
 
 void ClassifyImages(MLContext mlContext, IDataView data, ITransformer trainedModel)
 {
     IDataView predictionData = trainedModel.Transform(data);
     IEnumerable<ModelOutput> predictions = mlContext.Data.CreateEnumerable<ModelOutput>(predictionData, reuseRowObject: true).Take(10);
-
+    
     Console.WriteLine("Classifying multiple images");
     foreach (var prediction in predictions)
     {
@@ -192,4 +192,6 @@ class ModelOutput
     public string Label { get; set; }
 
     public string PredictedLabel { get; set; }
+
+    public float[] Score { get; set; }
 }
