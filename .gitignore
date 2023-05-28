@@ -371,3 +371,7 @@ FodyWeavers.xsd
 /ImageClassification/test/*.jpg
 /ImageClassification/test/*.png
 /ImageClassification/workspace/*.zip
+
+# Ignore .csv and .zip files within assets and workspace
+/Regression/assets/*.csv
+/Regression/workspace/*.zip
