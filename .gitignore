@@ -375,3 +375,5 @@ FodyWeavers.xsd
 # Ignore .csv and .zip files within assets and workspace
 /Regression/assets/*.csv
 /Regression/workspace/*.zip
+
+/TextClassification.ModelBuilder/assets/*.csv

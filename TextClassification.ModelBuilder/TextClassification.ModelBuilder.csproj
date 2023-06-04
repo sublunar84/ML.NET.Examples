@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="assets\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="1.7.1" />
+  </ItemGroup>
+  <ItemGroup Label="TextClassification">
+    <None Include="TextClassification.consumption.cs">
+      <DependentUpon>TextClassification.mbconfig</DependentUpon>
+    </None>
+    <None Include="TextClassification.training.cs">
+      <DependentUpon>TextClassification.mbconfig</DependentUpon>
+    </None>
+    <None Include="TextClassification.zip">
+      <DependentUpon>TextClassification.mbconfig</DependentUpon>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
