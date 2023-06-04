@@ -377,3 +377,8 @@ FodyWeavers.xsd
 /Regression/workspace/*.zip
 
 /TextClassification.ModelBuilder/assets/*.csv
+
+/TextClassification.ModelBuilder/TextClassification.mbconfig
+/TextClassification.ModelBuilder/TextClassification.consumption.cs
+/TextClassification.ModelBuilder/TextClassification.training.cs
+/TextClassification.ModelBuilder/TextClassification.zip
