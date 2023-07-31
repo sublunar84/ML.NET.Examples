@@ -17,16 +17,4 @@
     <PackageReference Include="Microsoft.ML.FastTree" Version="2.0.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="assets\laptopPrice.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="assets\taxi-fare-test.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="assets\taxi-fare-train.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

@@ -363,18 +363,13 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Ignore directories within assets
-/ImageClassification/assets/*/
+
 
 # Ignore .jpg, .png, and .zip files within assets, workspace and test
-/ImageClassification/assets/*.jpg
-/ImageClassification/assets/*.png
-/ImageClassification/test/*.jpg
-/ImageClassification/test/*.png
-/ImageClassification/workspace/*.zip
+
 
 # Ignore .csv and .zip files within assets and workspace
-/Regression/assets/*.csv
-/Regression/workspace/*.zip
+
 
 /TextClassification.ModelBuilder/assets/*.csv
 

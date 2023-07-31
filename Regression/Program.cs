@@ -5,7 +5,7 @@ var projectDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "
 var assetsRelativePath = Path.Combine(projectDirectory, "assets");
 var workspaceRelativePath = Path.Combine(projectDirectory, "workspace");
 
-Console.WriteLine("Press A to train and save a model, press B to make predicitions with a saved model");
+Console.WriteLine("Press A to train and save a model, press B to make predictions with a saved model");
 
 var answer = Console.ReadKey();
 
@@ -29,27 +29,21 @@ void TrainModel()
 
     IDataView dataView = mlContext.Data.LoadFromTextFile<ModelInput>(Path.Combine(assetsRelativePath, "Life Expectancy Data.csv"), hasHeader: true, separatorChar: ',');
 
-   var pipeline = mlContext.Transforms.CopyColumns(outputColumnName: "Label", inputColumnName: "LifeExpectancy")
-       .Append(mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName: "StatusEncoded", inputColumnName: "Status"))
+   var pipeline = mlContext.Transforms.Categorical.OneHotEncoding(outputColumnName: "StatusEncoded", inputColumnName: "Status")
        .Append(mlContext.Transforms.Concatenate("Features", "StatusEncoded", "AdultMortality", "InfantDeaths", "Alcohol", "PercentageExpenditure", "HepatitisB", "Measles", "BMI"))
        .Append(mlContext.Regression.Trainers.FastTree());
-
-    // Shuffle rows
-    dataView = mlContext.Data.ShuffleRows(dataView);
-
-    // split into test and train sets
+    
+    // Split into test and train sets
     var trainSplit = mlContext.Data.TrainTestSplit(dataView, testFraction: 0.2);
-    var validationTestSplit = mlContext.Data.TrainTestSplit(trainSplit.TestSet);
 
     IDataView trainSet = trainSplit.TrainSet;
-    IDataView validationSet = validationTestSplit.TrainSet;
-    IDataView testSet = validationTestSplit.TestSet;
+    IDataView testSet = trainSplit.TestSet;
 
     var trainedModel = pipeline.Fit(trainSet);
 
     SaveModel(mlContext, trainedModel, dataView);
     Evaluate(mlContext, trainedModel, testSet);
-    MakePredictions(validationSet);
+    MakePredictions(testSet);
 }
 
 void SaveModel(MLContext mlContext, ITransformer trainedModel, IDataView data)
@@ -60,9 +54,8 @@ void SaveModel(MLContext mlContext, ITransformer trainedModel, IDataView data)
 
 void Evaluate(MLContext mlContext, ITransformer model, IDataView testData)
 {
-    //IDataView dataView = mlContext.Data.LoadFromTextFile<ModelInput>(Path.Combine(assetsRelativePath, "taxi-fare-test.csv"), hasHeader: true, separatorChar: ',');
     var predictions = model.Transform(testData);
-    var metrics = mlContext.Regression.Evaluate(predictions, "Label", "Score");
+    var metrics = mlContext.Regression.Evaluate(predictions);
 
     Console.WriteLine();
     Console.WriteLine($"*************************************************");
@@ -73,40 +66,34 @@ void Evaluate(MLContext mlContext, ITransformer model, IDataView testData)
 
 }
 
-void MakePredictions(IDataView validationSet = null)
+void MakePredictions(IDataView? testSet = null)
 {
     MLContext mlContext = new MLContext();
 
     // Load Trained Model
-    ITransformer trainedModel = mlContext.Model.Load(Path.Combine(workspaceRelativePath, "model.zip"), out var modelSchema);
+    ITransformer model = mlContext.Model.Load(Path.Combine(workspaceRelativePath, "model.zip"), out _);
 
-    TestSinglePrediction(mlContext, trainedModel, validationSet);
+	var predictionFunction = mlContext.Model.CreatePredictionEngine<ModelInput, ModelOutput>(model);
 
-}
+	// If testSet is null, use random rows from file Life Expectancy Data.csv:
+	if (testSet == null)
+	{
+		var dataView = mlContext.Data.LoadFromTextFile<ModelInput>(Path.Combine(assetsRelativePath, "Life Expectancy Data.csv"), hasHeader: true, separatorChar: ',');
+		testSet = mlContext.Data.ShuffleRows(dataView);
+		testSet = mlContext.Data.TakeRows(testSet, 3);
+	}
 
-void TestSinglePrediction(MLContext mlContext, ITransformer model, IDataView validationSet)
-{
-    var predictionFunction = mlContext.Model.CreatePredictionEngine<ModelInput, ModelOutput>(model);
+	mlContext.Data.CreateEnumerable<ModelInput>(testSet, reuseRowObject: false).Take(3).ToList().ForEach(sample =>
+	{
+		var prediction = predictionFunction.Predict(sample);
 
-    // If validationSet is null, use random rows from file Life Expectancy Data.csv:
-    if (validationSet == null)
-    {
-        var dataView = mlContext.Data.LoadFromTextFile<ModelInput>(Path.Combine(assetsRelativePath, "Life Expectancy Data.csv"), hasHeader: true, separatorChar: ',');
-        validationSet = mlContext.Data.ShuffleRows(dataView);
-        validationSet = mlContext.Data.TakeRows(dataView, 3);
-    } 
-
-    mlContext.Data.CreateEnumerable<ModelInput>(validationSet, reuseRowObject: false).Take(3).ToList().ForEach(sample =>
-    {
-        var prediction = predictionFunction.Predict(sample);
-
-        Console.WriteLine($"**********************************************************************");
-        Console.WriteLine($"Predicted life expectancy: {prediction.LifeExpectancy:0.####}, actual life expectancy: {sample.LifeExpectancy}");
-        Console.WriteLine($"**********************************************************************");
-    });
-    
+		Console.WriteLine($"**********************************************************************");
+		Console.WriteLine($"Predicted life expectancy: {prediction.LifeExpectancy:0.####}, actual life expectancy: {sample.LifeExpectancy}");
+		Console.WriteLine($"**********************************************************************");
+	});
 
 }
+
 public class ModelInput
 {
     // Country,Year,Status,Life expectancy ,Adult Mortality,infant deaths,Alcohol,percentage expenditure,Hepatitis B,Measles , BMI ,under-five deaths ,Polio,Total expenditure,Diphtheria , HIV/AIDS,GDP,Population, thinness  1-19 years, thinness 5-9 years,Income composition of resources,Schooling
@@ -114,7 +101,7 @@ public class ModelInput
     [LoadColumn(2)]
     public string? Status;
 
-    [LoadColumn(3)]
+    [LoadColumn(3), ColumnName("Label")]
     public float LifeExpectancy;
 
     [LoadColumn(4)]

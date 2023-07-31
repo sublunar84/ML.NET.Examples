@@ -1,5 +1,5 @@
-﻿
-using Microsoft.ML;
+﻿using Microsoft.ML;
+using Microsoft.ML.Data;
 using static Microsoft.ML.DataOperationsCatalog;
 using Microsoft.ML.Vision;
 
@@ -23,7 +23,6 @@ switch (answer.KeyChar.ToString().ToUpper())
     default:
         Console.WriteLine("Wrong answer!");
         break;
-
 }
 
 void TrainModel()
@@ -35,18 +34,8 @@ void TrainModel()
 
     IDataView shuffledData = mlContext.Data.ShuffleRows(imageData);
 
-    var preprocessingPipeline = mlContext.Transforms.Conversion.MapValueToKey(
-            inputColumnName: "Label",
-            outputColumnName: "LabelAsKey")
-        .Append(mlContext.Transforms.LoadRawImageBytes(
-            outputColumnName: "Image",
-            imageFolder: assetsRelativePath,
-            inputColumnName: "ImagePath"));
-
-    IDataView preProcessedData = preprocessingPipeline
-                        .Fit(shuffledData)
-                        .Transform(shuffledData);
-
+    IDataView preProcessedData = GetPreProcessedData(mlContext, shuffledData);
+    
     TrainTestData trainSplit = mlContext.Data.TrainTestSplit(data: preProcessedData, testFraction: 0.3);
     TrainTestData validationTestSplit = mlContext.Data.TrainTestSplit(trainSplit.TestSet);
 
@@ -72,9 +61,35 @@ void TrainModel()
     ITransformer trainedModel = trainingPipeline.Fit(trainSet);
 
     SaveModel(mlContext, trainedModel, trainSet);
+    
+    IDataView predictions = trainedModel.Transform(testSet);
+    MulticlassClassificationMetrics metrics =
+	    mlContext.MulticlassClassification.Evaluate(predictions,
+		    labelColumnName: "LabelAsKey",
+		    predictedLabelColumnName: "PredictedLabel");
 
-    // Use test data to evaluate model
-    ClassifyImages(mlContext, testSet, trainedModel);
+    Console.WriteLine();
+    Console.WriteLine($"*************************************************");
+    Console.WriteLine($"*       Model quality metrics evaluation         ");
+    Console.WriteLine($"*------------------------------------------------");
+	Console.WriteLine($"LogLoss is: {metrics.LogLoss}");
+    Console.WriteLine($"PerClassLogLoss is: {string.Join(" , ", metrics.PerClassLogLoss.Select(c => c.ToString()))}");
+
+}
+
+IDataView GetPreProcessedData(MLContext mlContext, IDataView data)
+{
+	var preprocessingPipeline = mlContext.Transforms.Conversion.MapValueToKey(
+			inputColumnName: "Label",
+			outputColumnName: "LabelAsKey")
+		.Append(mlContext.Transforms.LoadRawImageBytes(
+			outputColumnName: "Image",
+			imageFolder: assetsRelativePath,
+			inputColumnName: "ImagePath"));
+
+	return preprocessingPipeline
+		.Fit(data)
+		.Transform(data);
 }
 
 void SaveModel(MLContext mlContext, ITransformer trainedModel, IDataView data)
@@ -87,18 +102,6 @@ static void OutputPrediction(ModelOutput prediction)
 {
     string imageName = Path.GetFileName(prediction.ImagePath);
     Console.WriteLine($"Image: {imageName} | Actual Value: {prediction.Label} | Predicted Value: {prediction.PredictedLabel} | Score: {prediction.Score.Max()}");
-}
-
-void ClassifyImages(MLContext mlContext, IDataView data, ITransformer trainedModel)
-{
-    IDataView predictionData = trainedModel.Transform(data);
-    IEnumerable<ModelOutput> predictions = mlContext.Data.CreateEnumerable<ModelOutput>(predictionData, reuseRowObject: true).Take(10);
-    
-    Console.WriteLine("Classifying multiple images");
-    foreach (var prediction in predictions)
-    {
-        OutputPrediction(prediction);
-    }
 }
 
 IEnumerable<ImageData> LoadImagesFromDirectory(string folder, bool useFolderNameAsLabel = true)
@@ -135,39 +138,31 @@ IEnumerable<ImageData> LoadImagesFromDirectory(string folder, bool useFolderName
     }
 }
 
-
 void MakePredictions()
 {
     MLContext mlContext = new MLContext();
 
     // Load Trained Model
-    ITransformer trainedModel = mlContext.Model.Load(Path.Combine(workspaceRelativePath, "model.zip"), out var modelSchema);
+    ITransformer trainedModel = mlContext.Model.Load(Path.Combine(workspaceRelativePath, "model.zip"), out _);
 
-    // Load image(s) from disk
-    var images = LoadImagesFromDirectory(testRelativePath);
+	// Load image(s) from disk
+	IEnumerable<ImageData> images = LoadImagesFromDirectory(testRelativePath, useFolderNameAsLabel: true);
+	IDataView imageData = mlContext.Data.LoadFromEnumerable(images);
 
-    // Preprocess image data
-    IDataView imageData = mlContext.Data.LoadFromEnumerable(images);
-    IDataView shuffledData = mlContext.Data.ShuffleRows(imageData);
+	IDataView preProcessedData = GetPreProcessedData(mlContext, imageData);
 
-    var preprocessingPipeline = mlContext.Transforms.Conversion.MapValueToKey(
-            inputColumnName: "Label",
-            outputColumnName: "LabelAsKey")
-        .Append(mlContext.Transforms.LoadRawImageBytes(
-            outputColumnName: "Image",
-            imageFolder: assetsRelativePath,
-            inputColumnName: "ImagePath"));
+	IEnumerable<ModelInput> imageInputs = mlContext.Data.CreateEnumerable<ModelInput>(preProcessedData, reuseRowObject: true);
 
-    IDataView predictionData = preprocessingPipeline
-                        .Fit(shuffledData)
-                        .Transform(shuffledData);
+	var predictor = mlContext.Model.CreatePredictionEngine<ModelInput, ModelOutput>(trainedModel);
 
-    // Make predictions
-    ClassifyImages(mlContext, predictionData, trainedModel);
-
+	Console.WriteLine("Classifying multiple images");
+	foreach (var image in imageInputs)
+    {
+	    OutputPrediction(predictor.Predict(image));
+    }
 }
 
-class ImageData
+public class ImageData
 {
     public string ImagePath { get; set; }
 
@@ -176,16 +171,16 @@ class ImageData
 
 class ModelInput
 {
-    public byte[] Image { get; set; }
+	public byte[] Image { get; set; }
 
-    public UInt32 LabelAsKey { get; set; }
+	public UInt32 LabelAsKey { get; set; }
 
-    public string ImagePath { get; set; }
+	public string ImagePath { get; set; }
 
-    public string Label { get; set; }
+	public string Label { get; set; }
 }
 
-class ModelOutput
+public class ModelOutput
 {
     public string ImagePath { get; set; }
 
@@ -193,5 +188,5 @@ class ModelOutput
 
     public string PredictedLabel { get; set; }
 
-    public float[] Score { get; set; }
+    public float[]? Score { get; set; }
 }
