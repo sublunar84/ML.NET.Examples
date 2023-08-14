@@ -369,7 +369,7 @@ FodyWeavers.xsd
 
 
 # Ignore .csv and .zip files within assets and workspace
-
+/ImageClassification/workspace/*.zip
 
 /TextClassification.ModelBuilder/assets/*.csv
 
